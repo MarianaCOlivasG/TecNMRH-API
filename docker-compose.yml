@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  rh-mysql:
+    image: mysql:8.0
+    restart: always
+    container_name: rh-mysql-container
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: Olivas031523
+      MYSQL_DATABASE: employeesdb
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - rh-pre-network
+
+  pre-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rh-pre-container
+    ports:
+      - "4300:80"
+    networks:
+      - rh-pre-network
+    depends_on:
+      - rh-mysql
+
+networks:
+  rh-pre-network:  
+volumes:
+  mysql-data:

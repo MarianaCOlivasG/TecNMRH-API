@@ -1,0 +1,85 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\assets\\2aae8e33-c0b7-43f9-a752-16b751b9534b.jpeg",
+      "PackagePath": "staticwebassets\\assets\\2aae8e33-c0b7-43f9-a752-16b751b9534b.jpeg"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\assets\\no-user.png",
+      "PackagePath": "staticwebassets\\assets\\no-user.png"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\assets\\no-user.webp",
+      "PackagePath": "staticwebassets\\assets\\no-user.webp"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\employees\\1a69f0a1-b89c-47a9-98b1-b7a5a74887c6.png",
+      "PackagePath": "staticwebassets\\employees\\1a69f0a1-b89c-47a9-98b1-b7a5a74887c6.png"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\employees\\71aa9f11-bef5-4905-82d0-6855e056fa6e.png",
+      "PackagePath": "staticwebassets\\employees\\71aa9f11-bef5-4905-82d0-6855e056fa6e.png"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\employees\\af7f0400-bc4c-4687-9e54-408c907337b3.png",
+      "PackagePath": "staticwebassets\\employees\\af7f0400-bc4c-4687-9e54-408c907337b3.png"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\ASTRYD AHOLIBAMA COUTIÑO MALDONADO.xlsx",
+      "PackagePath": "staticwebassets\\exports\\ASTRYD AHOLIBAMA COUTIÑO MALDONADO.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\DIEGO ARMANDO SANCHEZ PEREZ.xlsx",
+      "PackagePath": "staticwebassets\\exports\\DIEGO ARMANDO SANCHEZ PEREZ.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\DOCENTES 1 may 2024 al 29 may 2024.zip",
+      "PackagePath": "staticwebassets\\exports\\DOCENTES 1 may 2024 al 29 may 2024.zip"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\ENRIQUE ALBERTO TREJO GUZMAN.xlsx",
+      "PackagePath": "staticwebassets\\exports\\ENRIQUE ALBERTO TREJO GUZMAN.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\JESSEL MARIA DE GUADALUPE QUINTAL PADERNILLA.xlsx",
+      "PackagePath": "staticwebassets\\exports\\JESSEL MARIA DE GUADALUPE QUINTAL PADERNILLA.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\LUIGI DEL CARMEN CHAY ALVAREZ.xlsx",
+      "PackagePath": "staticwebassets\\exports\\LUIGI DEL CARMEN CHAY ALVAREZ.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\LUIS ARON CHULIN BACAB.xlsx",
+      "PackagePath": "staticwebassets\\exports\\LUIS ARON CHULIN BACAB.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\MAGDA MAGALY MOLINA LEON.xlsx",
+      "PackagePath": "staticwebassets\\exports\\MAGDA MAGALY MOLINA LEON.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\PEDRO JESUS ESTRADA CHI.xlsx",
+      "PackagePath": "staticwebassets\\exports\\PEDRO JESUS ESTRADA CHI.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\Personal PEESaD\\Desktop\\TIMECLOCK\\TecNMEmployeesAPI\\TecNMEmployeesAPI\\wwwroot\\exports\\attendances\\asistencias.xlsx",
+      "PackagePath": "staticwebassets\\exports\\attendances\\asistencias.xlsx"
+    },
+    {
+      "Id": "obj\\Debug\\net6.0\\staticwebassets\\msbuild.TecNMEmployeesAPI.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net6.0\\staticwebassets\\msbuild.build.TecNMEmployeesAPI.props",
+      "PackagePath": "build\\TecNMEmployeesAPI.props"
+    },
+    {
+      "Id": "obj\\Debug\\net6.0\\staticwebassets\\msbuild.buildMultiTargeting.TecNMEmployeesAPI.props",
+      "PackagePath": "buildMultiTargeting\\TecNMEmployeesAPI.props"
+    },
+    {
+      "Id": "obj\\Debug\\net6.0\\staticwebassets\\msbuild.buildTransitive.TecNMEmployeesAPI.props",
+      "PackagePath": "buildTransitive\\TecNMEmployeesAPI.props"
+    }
+  ],
+  "ElementsToRemove": []
+}
