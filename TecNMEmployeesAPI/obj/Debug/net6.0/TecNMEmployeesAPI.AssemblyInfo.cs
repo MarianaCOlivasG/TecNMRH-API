@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TecNMEmployeesAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+99f283087c8f558c89e39a1c45ff989c47a5ebcf")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+62e82709c499cbefbb6c69faca9117c82893d04f")]
 [assembly: System.Reflection.AssemblyProductAttribute("TecNMEmployeesAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TecNMEmployeesAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
