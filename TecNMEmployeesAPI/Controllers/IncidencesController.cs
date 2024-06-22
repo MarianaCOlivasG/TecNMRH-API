@@ -1200,9 +1200,9 @@ namespace TecNMEmployeesAPI.Controllers
             s => s.SaturdayCheckOut
             };
             var allAttendances = await Context.Attendances
-    .Where(a => a.Date >= inicidenceFiltersDTO.StartDate && a.Date <= inicidenceFiltersDTO.FinalDate)
-    .Include(a => a.Station)
-    .ToListAsync();
+            .Where(a => a.Date >= inicidenceFiltersDTO.StartDate && a.Date <= inicidenceFiltersDTO.FinalDate)
+            .Include(a => a.Station)
+            .ToListAsync();
 
 
             for (var day = inicidenceFiltersDTO.StartDate; day <= inicidenceFiltersDTO.FinalDate; day = day.AddDays(1))
@@ -1321,7 +1321,7 @@ namespace TecNMEmployeesAPI.Controllers
                                         && a.Time > limitTime)
                             .OrderBy(a => Math.Abs((a.Time - timeOut).Ticks))
                             .FirstOrDefault();
-                            if (attendanceIn == null)
+                        if (attendanceIn == null)
                         {
                             attendanceIn = new Attendance();
                         }
@@ -1333,8 +1333,8 @@ namespace TecNMEmployeesAPI.Controllers
                         var attendanceInDTO = Mapper.Map<AttendanceDTO>(attendanceIn);
                         var attendanceOutDTO = Mapper.Map<AttendanceDTO>(attendanceOut);
 
-                        // Crear la incidencia
-                        IncidenceTestDTO incidenceDTO = new()
+                         // Crear la incidencia
+                        var incidenceDTO = new IncidenceTestDTO
                         {
                             Employee = employeeDTO,
                             Date = day,
@@ -1345,110 +1345,60 @@ namespace TecNMEmployeesAPI.Controllers
                         };
 
 
-
-
                         // ============ INCIDENCIAAA ENTRADA ============ 
 
                         // attendanceIn.Time tengo la hora de la checada ganadora
 
-                        if (attendanceIn.Time == new TimeSpan(0, 0, 0, 0, 0))
+                        TimeSpan timeInSubMin = timeIn.Subtract(timesTolerancia.InputMin);
+                        TimeSpan timeInAddMax = timeIn.Add(timesTolerancia.InputMax);
+                        TimeSpan timeInAddMaxTwice = timeInAddMax.Add(timesTolerancia.InputMax);
+                        TimeSpan timeInAddMaxThrice = timeInAddMaxTwice.Add(timesTolerancia.InputMax);
+
+                        if (attendanceIn.Time == TimeSpan.Zero)
                         {
-                            // Verificar si hay registro superior
-                            var attendanceToday = await Context.Attendances
-                                                            .FirstOrDefaultAsync(a =>
-                                                             a.EmployeeId == schedules[i].EmployeeId &&
-                                                            a.Date.Date == day.Date &&
-                                                            a.Time > timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax) &&
-                                                             a.Time >= startOfTheDay &&
-                                                             a.Time <= endOfTheDay);
+                            var attendanceToday = allAttendances
+                                .FirstOrDefault(a =>
+                                    a.EmployeeId == schedules[i].EmployeeId &&
+                                    a.Date.Date == day.Date &&
+                                    a.Time > timeInAddMaxThrice &&
+                                    a.Time >= startOfTheDay &&
+                                    a.Time <= endOfTheDay);
 
                             if (attendanceToday == null)
                             {
-                                //Console.WriteLine("FALTA");
-                                //Console.WriteLine("NO HAY CHECADA");
-
                                 incidenceDTO.Descriptions.Add("No hay un registro de asistencia.");
                                 incidenceDTO.Types.Add(7);
-
                             }
                             else
                             {
-                                //Console.WriteLine("OMISIÓN DE ENTRADA");
-                                //Console.WriteLine("CHECO SALIDA A LAS");
-                                //Console.WriteLine(attendanceToday.Time);
-
                                 incidenceDTO.Descriptions.Add("Omisión de entrada. No hay asistencia correspondiente a su entrada.");
                                 incidenceDTO.Types.Add(6);
-
                             }
-
                         }
-                        else if (attendanceIn.Time >= timeIn.Subtract(timesTolerancia.InputMin) && attendanceIn.Time <= timeIn.Add(timesTolerancia.InputMax))
+                        else if (attendanceIn.Time >= timeInSubMin && attendanceIn.Time <= timeInAddMax)
                         {
-                            //Console.WriteLine("SIN INCIDENCIA, ENTRADA CORRECTA");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceIn.Time);
-                            //Console.WriteLine("ENTRE");
-                            //Console.WriteLine(timeIn.Subtract(timesTolerancia.InputMin));
-                            //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax));
-
-                            incidenceDTO.Descriptions.Add($"Sin incidencia, entrada correcta. Su asistencia fue registrada dentro del limite de tolerancia. {timeIn.Subtract(timesTolerancia.InputMin)} y {timeIn.Add(timesTolerancia.InputMax)}");
+                            incidenceDTO.Descriptions.Add($"Sin incidencia, entrada correcta. Su asistencia fue registrada dentro del límite de tolerancia. {timeInSubMin} y {timeInAddMax}");
                             incidenceDTO.Types.Add(1);
-
                         }
-                        else if (attendanceIn.Time < timeIn.Subtract(timesTolerancia.InputMin))
+                        else if (attendanceIn.Time < timeInSubMin)
                         {
-                            //Console.WriteLine("ENTRADA PREVIA");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceIn.Time);
-                            //Console.WriteLine("ANTES");
-                            //Console.WriteLine(timeIn.Subtract(timesTolerancia.InputMin));
-
-                            incidenceDTO.Descriptions.Add($"Entrada previa. Su asistencia fue registrada antes de {timeIn.Subtract(timesTolerancia.InputMin)}");
+                            incidenceDTO.Descriptions.Add($"Entrada previa. Su asistencia fue registrada antes de {timeInSubMin}");
                             incidenceDTO.Types.Add(2);
-
                         }
-                        else if (attendanceIn.Time > timeIn.Add(timesTolerancia.InputMax) && attendanceIn.Time <= timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax))
+                        else if (attendanceIn.Time > timeInAddMax && attendanceIn.Time <= timeInAddMaxTwice)
                         {
-                            //Console.WriteLine("RETARDO A");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceIn.Time);
-                            //Console.WriteLine("DESPUES DE ");
-                            //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax));
-                            //Console.WriteLine("ANTES O IGUAL A");
-                            //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax));
-
-                            incidenceDTO.Descriptions.Add($"Retardo A. Su asistencia fue registrada entre {timeIn.Add(timesTolerancia.InputMax).Add(new TimeSpan(0, 0, 1))} y {timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax)}");
+                            incidenceDTO.Descriptions.Add($"Retardo A. Su asistencia fue registrada entre {timeInAddMax.Add(new TimeSpan(0, 0, 1))} y {timeInAddMaxTwice}");
                             incidenceDTO.Types.Add(3);
-
                         }
-                        else if (attendanceIn.Time > timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax) && attendanceIn.Time <= timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax))
+                        else if (attendanceIn.Time > timeInAddMaxTwice && attendanceIn.Time <= timeInAddMaxThrice)
                         {
-                            //Console.WriteLine("RETARDO B");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceIn.Time);
-                            //Console.WriteLine("DESPUES DE ");
-                            //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax));
-                            //Console.WriteLine("ANTES O IGUAL A");
-                            //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax));
-
-                            incidenceDTO.Descriptions.Add($"Retardo B. Su asistencia fue registrada entre {timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(new TimeSpan(0, 0, 1))} y {timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax)}");
+                            incidenceDTO.Descriptions.Add($"Retardo B. Su asistencia fue registrada entre {timeInAddMaxTwice.Add(new TimeSpan(0, 0, 1))} y {timeInAddMaxThrice}");
                             incidenceDTO.Types.Add(4);
-
                         }
-                        else if (attendanceIn.Time > timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax) && attendanceIn.Time <= limitTime)
+                        else if (attendanceIn.Time > timeInAddMaxThrice && attendanceIn.Time <= limitTime)
                         {
-                            //Console.WriteLine("ENTRADA TARDIA");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceIn.Time);
-                            //Console.WriteLine("DESPUES DE ");
-                            //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax));
-                            //Console.WriteLine("ANTES O IGUAL A");
-                            //Console.WriteLine(limitTime);
-
-                            incidenceDTO.Descriptions.Add($"Entrada tardia. Su asistencia fue registrada después {timeIn.Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(timesTolerancia.InputMax).Add(new TimeSpan(0, 0, 1))}.");
+                            incidenceDTO.Descriptions.Add($"Entrada tardía. Su asistencia fue registrada después de {timeInAddMaxThrice.Add(new TimeSpan(0, 0, 1))}.");
                             incidenceDTO.Types.Add(5);
-
                         }
 
                         // RETARDO A -
@@ -1459,163 +1409,66 @@ namespace TecNMEmployeesAPI.Controllers
                         // FALTA -
                         // OMISIÓN DE ENTRADA -
 
-
-
-
-                        //Console.WriteLine("====================");
-
-                        //Console.WriteLine("Hora de entrada");
-                        //Console.WriteLine(timeIn);
-
-                        //Console.WriteLine("Hora de salida");
-                        //Console.WriteLine(timeOut);
-
-                        //Console.WriteLine("Hora de checada entrada");
-                        //Console.WriteLine(attendanceIn.Time);
-
-                        //Console.WriteLine("Hora de checada salida");
-                        //Console.WriteLine(attendanceOut.Time);
-
-                        //Console.WriteLine("Hora tolerancia entrada antes");
-                        //Console.WriteLine(timeIn.Subtract(timesTolerancia.InputMin));
-                        //Console.WriteLine("Hora tolerancia entrada después");
-                        //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax));
-
-                        //Console.WriteLine("Hora tolerancia salida antes");
-                        //Console.WriteLine(timeOut.Subtract(timesTolerancia.OutputMin));
-                        //Console.WriteLine("Hora tolerancia salida después");
-                        //Console.WriteLine(timeOut.Add(timesTolerancia.OutputMax));
-
-
-
                         // ============ INCIDENCIAAA SALIDA ============ 
 
 
+                        TimeSpan timeOutSubMin = timeOut.Subtract(timesTolerancia.OutputMin);
+                        TimeSpan timeOutAddMax = timeOut.Add(timesTolerancia.OutputMax);
 
-                        if (attendanceOut.Time == new TimeSpan(0, 0, 0, 0, 0))
+                        if (attendanceOut.Time == TimeSpan.Zero)
                         {
-                            // Verificar si hay registro inferior (de entrada)
-                            var attendanceToday = await Context.Attendances
-                                                            .FirstOrDefaultAsync(a =>
-                                                             a.EmployeeId == schedules[i].EmployeeId &&
-                                                            a.Date.Date == day.Date &&
-                                                            a.Time < limitTime
-                                                             && a.Time >= startOfTheDay
-                                                            && a.Time <= endOfTheDay);
+                            var attendanceToday = allAttendances
+                                .FirstOrDefault(a =>
+                                    a.EmployeeId == schedules[i].EmployeeId &&
+                                    a.Date.Date == day.Date &&
+                                    a.Time < limitTime &&
+                                    a.Time >= startOfTheDay &&
+                                    a.Time <= endOfTheDay);
 
                             if (attendanceToday == null)
                             {
-                                //Console.WriteLine("FALTA");
-                                //Console.WriteLine("NO HAY CHECADA");
-
                                 incidenceDTO.Descriptions.Add("No hay un registro de asistencia.");
                                 incidenceDTO.Types.Add(7);
-
                             }
                             else
                             {
-                                //Console.WriteLine("OMISIÓN DE SALIDA");
-                                //Console.WriteLine("CHECO SALIDA A LAS");
-                                //Console.WriteLine(attendanceToday.Time);
-
                                 incidenceDTO.Descriptions.Add("Omisión de salida. No hay asistencia correspondiente a su salida.");
                                 incidenceDTO.Types.Add(10);
-
                             }
-
                         }
-                        else if (attendanceOut.Time >= timeOut.Subtract(timesTolerancia.OutputMin) && attendanceOut.Time <= timeOut.Add(timesTolerancia.OutputMax))
+                        else if (attendanceOut.Time >= timeOutSubMin && attendanceOut.Time <= timeOutAddMax)
                         {
-                            //Console.WriteLine("SIN INCIDENCIA, SALIDA CORRECTA");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceOut.Time);
-                            //Console.WriteLine("ENTRE");
-                            //Console.WriteLine(timeOut.Subtract(timesTolerancia.OutputMin));
-                            //Console.WriteLine(timeOut.Add(timesTolerancia.OutputMax));
-
-                            incidenceDTO.Descriptions.Add($"Sin incidencia, salida correcta. Su salida fue registrada dentro del limite de tolerancia. {timeOut.Subtract(timesTolerancia.OutputMin)} y {timeOut.Add(timesTolerancia.OutputMax)}");
+                            incidenceDTO.Descriptions.Add($"Sin incidencia, salida correcta. Su salida fue registrada dentro del límite de tolerancia. {timeOutSubMin} y {timeOutAddMax}");
                             incidenceDTO.Types.Add(8);
-
                         }
-                        else if (attendanceOut.Time < timeOut.Subtract(timesTolerancia.OutputMin))
+                        else if (attendanceOut.Time < timeOutSubMin)
                         {
-                            //Console.WriteLine("SALIDA PREVIA");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceOut.Time);
-                            //Console.WriteLine("ANTES");
-                            //Console.WriteLine(timeOut.Subtract(timesTolerancia.OutputMin));
-
-                            incidenceDTO.Descriptions.Add($"Salida previa. Su salida fue registrada antes de {timeOut.Subtract(timesTolerancia.OutputMin)}");
+                            incidenceDTO.Descriptions.Add($"Salida previa. Su salida fue registrada antes de {timeOutSubMin}");
                             incidenceDTO.Types.Add(9);
-
                         }
-                        else if (attendanceOut.Time > timeOut.Add(timesTolerancia.OutputMax))
+                        else if (attendanceOut.Time > timeOutAddMax)
                         {
-                            //Console.WriteLine("SALIDA TARDÍA");
-                            //Console.WriteLine("Hora de la checada");
-                            //Console.WriteLine(attendanceOut.Time);
-                            //Console.WriteLine("DESPUES DE ");
-                            //Console.WriteLine(timeOut.Add(timesTolerancia.OutputMax));
-
-                            incidenceDTO.Descriptions.Add($"Salida tardía. Su salida fue registrada despues de {timeOut.Add(timesTolerancia.OutputMax).Add(new TimeSpan(0, 0, 1))}");
+                            incidenceDTO.Descriptions.Add($"Salida tardía. Su salida fue registrada después de {timeOutAddMax.Add(new TimeSpan(0, 0, 1))}");
                             incidenceDTO.Types.Add(11);
-
                         }
 
-
-
-                        //Console.WriteLine("====================");
-
-                        //Console.WriteLine("Hora de entrada");
-                        //Console.WriteLine(timeIn);
-
-                        //Console.WriteLine("Hora de salida");
-                        //Console.WriteLine(timeOut);
-
-                        //Console.WriteLine("Hora de checada salida");
-                        //Console.WriteLine(attendanceOut.Time);
-
-                        //Console.WriteLine("Hora tolerancia entrada antes");
-                        //Console.WriteLine(timeIn.Subtract(timesTolerancia.InputMin));
-                        //Console.WriteLine("Hora tolerancia entrada después");
-                        //Console.WriteLine(timeIn.Add(timesTolerancia.InputMax));
-
-                        //Console.WriteLine("Hora tolerancia salida antes");
-                        //Console.WriteLine(timeOut.Subtract(timesTolerancia.OutputMin));
-                        //Console.WriteLine("Hora tolerancia salida después");
-                        //Console.WriteLine(timeOut.Add(timesTolerancia.OutputMax));
-
-
-                        if (permitEmployee != null && permitEmployee.Type == 0)
+                        if (permitEmployee != null)
                         {
-                            //Console.WriteLine("=================================");
-                            //Console.WriteLine("TIENE PERMISO TODO EL DIA");
-                            //Console.WriteLine("=================================");
-                            //Console.WriteLine(day);
-
                             var permitEmployeeDTO = Mapper.Map<WorkPermitDTO>(permitEmployee);
                             incidenceDTO.Permit = permitEmployeeDTO;
-                            incidenceDTO.Descriptions[0] = $"Permiso {permitEmployeeDTO.Permit.Title} " + (permitEmployeeDTO.Permit.RequiredAttendance ? "con " : "sin ") + "registro de reloj.";
-                            incidenceDTO.Descriptions[1] = $"Permiso {permitEmployeeDTO.Permit.Title} " + (permitEmployeeDTO.Permit.RequiredAttendance ? "con " : "sin ") + "registro de reloj.";
+                            var description = $"Permiso {permitEmployeeDTO.Permit.Title} " + (permitEmployeeDTO.Permit.RequiredAttendance ? "con " : "sin ") + "registro de reloj.";
+
+                            if (permitEmployee.Type == 0 || permitEmployee.WorkScheduleId == schedules[i].Id)
+                            {
+                                incidenceDTO.Descriptions[0] = description;
+                                incidenceDTO.Descriptions[1] = description;
+                            }
                         }
 
-                        if (permitEmployee != null && permitEmployee.WorkScheduleId == schedules[i].Id)
-                        {
-                            //Console.WriteLine("=================================");
-                            //Console.WriteLine("TIENE PERMISO EN UN HORARIO ESPECIFICO");
-                            //Console.WriteLine("=================================");
-                            //Console.WriteLine(day);
 
-                            var permitEmployeeDTO = Mapper.Map<WorkPermitDTO>(permitEmployee);
-                            incidenceDTO.Permit = permitEmployeeDTO;
-                            incidenceDTO.Descriptions[0] = $"Permiso {permitEmployeeDTO.Permit.Title} " + (permitEmployeeDTO.Permit.RequiredAttendance ? "con " : "sin ") + "registro de reloj.";
-                            incidenceDTO.Descriptions[1] = $"Permiso {permitEmployeeDTO.Permit.Title} " + (permitEmployeeDTO.Permit.RequiredAttendance ? "con " : "sin ") + "registro de reloj.";
-                        }
-
-                        var Attendances = await Context.Attendances
-                                                .Where(a => a.EmployeeId == schedules[i].EmployeeId &&
-                                                            a.Date.Date == day.Date)
-                                                .ToListAsync();
+                        var Attendances = allAttendances
+                        .Where(a => a.EmployeeId == schedules[i].EmployeeId && a.Date.Date == day.Date)
+                        .ToList();
                         var attendanceDTO = Mapper.Map<List<AttendanceDTO>>(Attendances);
                         incidenceDTO.AttendancesAll = attendanceDTO;
 
