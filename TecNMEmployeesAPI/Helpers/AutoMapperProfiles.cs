@@ -80,11 +80,15 @@ namespace TecNMEmployeesAPI.Helpers
 
             CreateMap<WorkSchedule, WorkScheduleDTO>().ReverseMap();
             CreateMap<WorkScheduleCreateDTO, WorkSchedule>();
-
+             
 
             CreateMap<Attendance, AttendanceDTO>().ReverseMap();
             CreateMap<AttendanceCreateDTO, Attendance>();
+            CreateMap<AttendanceCreateDateRequiredDTO, Attendance>();
 
+
+            CreateMap<AttendanceLog, AttendanceLogDTO>().ReverseMap();
+            CreateMap<AttendanceLogCreateDTO, AttendanceLog>();
 
 
             CreateMap<Time, TimeDTO>().ReverseMap();

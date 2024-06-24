@@ -238,6 +238,29 @@ namespace TecNMEmployeesAPI.Migrations
                     b.ToTable("Attendances");
                 });
 
+            modelBuilder.Entity("TecNMEmployeesAPI.Entities.AttendanceLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("Date");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StationId")
+                        .HasColumnType("int");
+
+                    b.Property<TimeSpan>("Time")
+                        .HasColumnType("time(6)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AttendanceLogs");
+                });
+
             modelBuilder.Entity("TecNMEmployeesAPI.Entities.ContractType", b =>
                 {
                     b.Property<int>("Id")

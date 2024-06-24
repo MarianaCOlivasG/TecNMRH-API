@@ -34,9 +34,6 @@ namespace TecNMEmployeesAPI
         }
 
 
-
-
-
         public DbSet<Period> Periods { get; set; }
         public DbSet<StaffType> StaffTypes { get; set; }
         public DbSet<ContractType> ContractTypes { get; set; }
@@ -53,6 +50,7 @@ namespace TecNMEmployeesAPI
         public DbSet<Permit> Permits { get; set; }
         public DbSet<WorkPermit> WorkPermits { get; set; }
         public DbSet<Time> Times { get; set; }
+        public DbSet<AttendanceLog> AttendanceLogs { get; set; }
 
 
 
