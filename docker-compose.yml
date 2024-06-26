@@ -28,6 +28,7 @@ services:
     depends_on:
       - rh-mysql
 
+
   rh-dev-dashboard:
     image: peesadedu/rh-dev-dashboard:latest
     container_name: dashboard-dev-container
