@@ -1,12 +1,16 @@
 ﻿using TecNMEmployeesAPI;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-//builder.WebHost.ConfigureKestrel(serverOptions =>
-//{
-//    serverOptions.ListenAnyIP(7700); // Escucha en el puerto 5000 en todas las direcciones IP
-//});
+// Añadir soporte para variables de entorno
+builder.Configuration.AddEnvironmentVariables();
+
+// Si quieres configurar Kestrel para escuchar en un puerto específico desde variables de entorno
+var port = Environment.GetEnvironmentVariable("SERVER_PORT") ?? "80";
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ListenAnyIP(int.Parse(port)); // Escucha en el puerto especificado en todas las direcciones IP
+});
 
 var startup = new Startup(builder.Configuration);
 

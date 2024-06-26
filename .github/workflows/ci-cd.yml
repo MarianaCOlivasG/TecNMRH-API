@@ -46,5 +46,5 @@ jobs:
           echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
           echo "JWT_SEED=${{ secrets.JWT_SEED }}" >> .env
           docker compose down
-          docker compose pull rh-dev-server rh-dev-dashboard
+          docker compose pull peesadedu/rh-dev-server:latest
           docker compose up -d
