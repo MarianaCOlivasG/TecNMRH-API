@@ -43,6 +43,6 @@ jobs:
           echo "TZ=${{ secrets.TZ }}" >> .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
           echo "SERVER_PORT=${{ secrets.SERVER_PORT }}" >> .env
-          docker-compose down
-          docker-compose pull rh-dev-server rh-dev-dashboard
-          docker-compose up -d
+          docker compose down
+          docker compose pull rh-dev-server rh-dev-dashboard
+          docker compose up -d
