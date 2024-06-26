@@ -22,8 +22,8 @@ jobs:
     - name: Build and Push Docker Image
       uses: docker/build-push-action@v2
       with:
-        context: .
-        file: ./Dockerfile
+        context: ./TecNMEmployeesAPI
+        file: ./TecNMEmployeesAPI/Dockerfile
         push: true
         tags: peesadedu/rh-dev-server:latest
 
