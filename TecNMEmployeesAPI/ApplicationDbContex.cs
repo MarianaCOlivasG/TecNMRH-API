@@ -53,6 +53,7 @@ namespace TecNMEmployeesAPI
         public DbSet<Permit> Permits { get; set; }
         public DbSet<WorkPermit> WorkPermits { get; set; }
         public DbSet<Time> Times { get; set; }
+        public DbSet<Incident> Incidents { get; set; }
 
 
 

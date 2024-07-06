@@ -13,7 +13,9 @@ namespace TecNMEmployeesAPI.Helpers
         public AutoMapperProfiles()
         {
 
-
+            CreateMap<IncidentDTO, Incident>().ReverseMap();
+            CreateMap<IncidentCreateDTO, Incident>().ReverseMap();
+            CreateMap<Incident, IncidentDTO>().ReverseMap();
 
             // Crear Mapa de Genre hasta GenreDTO y viseversa
             // Convertir los datos de tipo Genre a un tipo GenreDTO y viseversa
