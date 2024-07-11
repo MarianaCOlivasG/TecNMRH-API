@@ -7,6 +7,8 @@
         public List<AttendanceDTO> Attendances { get; set; }
         public List<TimeSpan> Checks { get; set; }
         public List<int> Types { get; set; }
+        public List<string> Color { get; set; }
+        public List<string> Name { get; set; }
         /*
             1 - Sin incidencia Entrada
             2 - Entrada Previa
