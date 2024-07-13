@@ -25,6 +25,30 @@
       "PackagePath": "staticwebassets\\employees\\af7f0400-bc4c-4687-9e54-408c907337b3.png"
     },
     {
+      "Id": "C:\\Users\\rr911\\source\\repos\\TecNMRH-API\\TecNMEmployeesAPI\\wwwroot\\exports\\1720665632509.xlsx",
+      "PackagePath": "staticwebassets\\exports\\1720665632509.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\rr911\\source\\repos\\TecNMRH-API\\TecNMEmployeesAPI\\wwwroot\\exports\\1720665640818.xlsx",
+      "PackagePath": "staticwebassets\\exports\\1720665640818.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\rr911\\source\\repos\\TecNMRH-API\\TecNMEmployeesAPI\\wwwroot\\exports\\1720665646827.xlsx",
+      "PackagePath": "staticwebassets\\exports\\1720665646827.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\rr911\\source\\repos\\TecNMRH-API\\TecNMEmployeesAPI\\wwwroot\\exports\\1720665647528.xlsx",
+      "PackagePath": "staticwebassets\\exports\\1720665647528.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\rr911\\source\\repos\\TecNMRH-API\\TecNMEmployeesAPI\\wwwroot\\exports\\1720665676755.xlsx",
+      "PackagePath": "staticwebassets\\exports\\1720665676755.xlsx"
+    },
+    {
+      "Id": "C:\\Users\\rr911\\source\\repos\\TecNMRH-API\\TecNMEmployeesAPI\\wwwroot\\exports\\1720665871438.xlsx",
+      "PackagePath": "staticwebassets\\exports\\1720665871438.xlsx"
+    },
+    {
       "Id": "C:\\Users\\rr911\\source\\repos\\TecNMRH-API\\TecNMEmployeesAPI\\wwwroot\\exports\\attendances\\asistencias.xlsx",
       "PackagePath": "staticwebassets\\exports\\attendances\\asistencias.xlsx"
     },

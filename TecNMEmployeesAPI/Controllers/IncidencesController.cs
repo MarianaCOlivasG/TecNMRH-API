@@ -2656,7 +2656,7 @@ namespace TecNMEmployeesAPI.Controllers
             var filters = incidencesDTOs.FindAll(item => item.Name[0] != "Entrada correcta" || item.Name[1] != "Salida correcta");
           
 
-            return incidencesDTOs;
+            return filters;
 
         }
 
