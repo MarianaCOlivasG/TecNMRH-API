@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for C# Application
+name: CI/CD Pipeline for C# APPLICATION
 
 on:
   push:
