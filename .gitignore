@@ -1,6 +1,64 @@
-﻿################################################################################
-# Este archivo .gitignore ha sido creado automáticamente por Microsoft(R) Visual Studio.
-################################################################################
+﻿# Visual Studio
+.vscode/
+.vs/
+.vscode/*
+.vs/*
+.vscode/settings.json
 
-/.vs
-/TecNMEmployeesAPI/bin
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Build directories
+bin/
+obj/
+out/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Auto-generated files
+*.nupkg
+*.snupkg
+*.log
+*.xml
+*.sln.ide
+*.sln.dotsettings.user
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+~$*
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# Mac
+.DS_Store
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# JetBrains Rider
+.idea/
+
+# Entity Framework Migrations
+Migrations/
+
+# Publish output
+publish/
+
+# Secrets
+secrets.json
