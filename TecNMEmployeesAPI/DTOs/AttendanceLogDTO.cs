@@ -1,11 +1,11 @@
 ﻿namespace TecNMEmployeesAPI.DTOs
 {
-    public class AttendanceLogDTO
+    public class AttendanceDTO
     {
 
         public int Id { get; set; }
-        public int StationId { get; set; }
-        public int EmployeeId { get; set; }
+        public StationDTO Station { get; set; }
+        public EmployeeWithoutDetailsDTO Employee { get; set; }
         public DateTime Date { get; set; }
         public TimeSpan Time { get; set; }
 

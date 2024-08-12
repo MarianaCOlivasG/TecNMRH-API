@@ -34,9 +34,6 @@ namespace TecNMEmployeesAPI
         }
 
 
-
-
-
         public DbSet<Period> Periods { get; set; }
         public DbSet<StaffType> StaffTypes { get; set; }
         public DbSet<ContractType> ContractTypes { get; set; }

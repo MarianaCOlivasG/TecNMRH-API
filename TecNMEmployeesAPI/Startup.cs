@@ -34,6 +34,12 @@ namespace TecNMEmployeesAPI
             services.AddHttpContextAccessor();
 
 
+            // Obtener las variables de entorno
+            var dbServer = Environment.GetEnvironmentVariable("DB_SERVER") ?? Configuration["DB_SERVER"];
+            var dbPort = Environment.GetEnvironmentVariable("DB_PORT") ?? Configuration["DB_PORT"];
+            var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? Configuration["DB_USER"];
+            var dbPwd = Environment.GetEnvironmentVariable("DB_PWD") ?? Configuration["DB_PWD"];
+
 
             // DbContext
             services.AddDbContext<ApplicationDbContext>(options =>

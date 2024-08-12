@@ -167,7 +167,7 @@ namespace TecNMEmployeesAPI.Controllers
                 return NotFound(attendanceFail);
             }
 
-            if ( !employee.IsActive )
+            if (!employee.IsActive)
             {
                 AttendanceFailDTO attendanceFail = new AttendanceFailDTO()
                 {
@@ -180,7 +180,7 @@ namespace TecNMEmployeesAPI.Controllers
             var schedules = await Context.WorkSchedules
                                   .FirstOrDefaultAsync(w => w.EmployeeId == attendanceCreateDTO.EmployeeId &&
                                          w.StartDate <= DateTime.Now &&
-                                        w.FinalDate >= DateTime.Now );
+                                        w.FinalDate >= DateTime.Now);
 
             if (schedules == null)
             {
@@ -207,7 +207,7 @@ namespace TecNMEmployeesAPI.Controllers
 
             var noticeDTO = new NoticeDTO { };
 
-            if ( notice != null )
+            if (notice != null)
             {
                 noticeDTO = Mapper.Map<NoticeDTO>(notice);
             }
@@ -228,7 +228,7 @@ namespace TecNMEmployeesAPI.Controllers
             attendanceCreateDTO.Time = DateTime.Now.TimeOfDay;
             attendanceCreateDTO.Date = DateTime.Now;
 
-            var attendance = Mapper.Map<Attendance>(attendanceCreateDTO); 
+            var attendance = Mapper.Map<Attendance>(attendanceCreateDTO);
 
 
 
@@ -253,6 +253,69 @@ namespace TecNMEmployeesAPI.Controllers
                }
            );
         }
+
+
+
+
+        // Insertar con fecha y hora dinamica
+        [HttpPost("simple")]
+        public async Task<ActionResult> SimpleCreate([FromBody] AttendanceCreateDateRequiredDTO attendanceCreateDTO)
+        {
+
+            var employee = await Context.Employees
+                                   .FirstOrDefaultAsync(e => e.Id == attendanceCreateDTO.EmployeeId);
+
+            if (employee == null)
+            {
+                AttendanceFailDTO attendanceFail = new AttendanceFailDTO()
+                {
+                    Employee = null,
+                    Message = $"No existe un empleado con el ID: {attendanceCreateDTO.EmployeeId}"
+                };
+                return NotFound(attendanceFail);
+            }
+
+            if (!employee.IsActive)
+            {
+                AttendanceFailDTO attendanceFail = new AttendanceFailDTO()
+                {
+                    Employee = Mapper.Map<EmployeeWithoutDetailsDTO>(employee),
+                    Message = "Empleado Inactivo. Favor de pasar a recursos humanos."
+                };
+                return NotFound(attendanceFail);
+            }
+
+            var schedules = await Context.WorkSchedules
+                                  .FirstOrDefaultAsync(w => w.EmployeeId == attendanceCreateDTO.EmployeeId &&
+                                         w.StartDate <= DateTime.Now &&
+                                        w.FinalDate >= DateTime.Now);
+
+            if (schedules == null)
+            {
+                AttendanceFailDTO attendanceFail = new AttendanceFailDTO()
+                {
+                    Employee = Mapper.Map<EmployeeWithoutDetailsDTO>(employee),
+                    Message = "No cuenta con horario.Favor de pasar con su jefe académico."
+                };
+                return NotFound(attendanceFail);
+            }
+
+            var attendance = Mapper.Map<Attendance>(attendanceCreateDTO);
+
+            Context.Add(attendance);
+            await Context.SaveChangesAsync();
+
+            var attendanceCreated = await Context.Attendances.AsNoTracking()
+                    .Include(a => a.Employee)
+                    .Include(a => a.Station)
+                    .FirstAsync(a => a.Id == attendance.Id);
+
+            var attendanceDTO = Mapper.Map<AttendanceDTO>(attendanceCreated);
+
+            return CreatedAtRoute("GetAttendanceById", new { id = attendanceDTO.Id }, attendanceDTO);
+
+        }
+
 
 
 
