@@ -1073,7 +1073,7 @@ namespace TecNMEmployeesAPI.Controllers
         }
 
 
-        [HttpGet("procesadas")]
+        [HttpGet("procesadas3")]
         public async Task<ActionResult<List<IncidenceTestDTO>>> GetAllProcesadas2([FromQuery] InicidenceFiltersDTO inicidenceFiltersDTO)
         {
 
@@ -1494,8 +1494,544 @@ namespace TecNMEmployeesAPI.Controllers
 
 
 
+        [HttpGet("procesadas")]
+        public async Task<ActionResult<List<IncidenceTestDTO>>> GetAllProcesadas3([FromQuery] InicidenceFiltersDTO inicidenceFiltersDTO)
+        {
 
 
+            var sfattType = await Context.StaffTypes.FirstOrDefaultAsync(s => s.Id == inicidenceFiltersDTO.StaffTypeId);
+
+            if (sfattType == null)
+            {
+                return NotFound($"No existe un tipo de empleado con el ID ${inicidenceFiltersDTO.StaffTypeId}.");
+            }
+
+            var incidents = await Context.Incidents
+             .Where(n => n.StaffTypeId == inicidenceFiltersDTO.StaffTypeId &&
+                         ((n.StartDate <= inicidenceFiltersDTO.FinalDate && n.EndDate >= inicidenceFiltersDTO.StartDate)))
+             .ToListAsync();
+
+            
+            // Obtener el dia de hoy
+            // DIA DE HOY
+            System.DateTime dateToday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
+
+            // VALIDAR QUE LOS FILTROS NO SEAN MENOR AL DIA DE HOY
+            if (inicidenceFiltersDTO.StartDate >= dateToday || inicidenceFiltersDTO.FinalDate >= dateToday)
+            {
+                return BadRequest("No se permite hacer incidencia en el día o posterior.");
+            }
+
+            // Obtener los tiempos de tolerancia
+            var timesTolerancia = await Context.Times
+                            .FirstOrDefaultAsync(t => t.StaffTypeId == inicidenceFiltersDTO.StaffTypeId);
+            if (timesTolerancia == null)
+            {
+                return NotFound("No existe tiempos de tolerancia");
+            }
+            //Creamos un filtro base para evitar volver a crearla en cada iteracion
+            var baseQueryable = Context.WorkSchedules.AsQueryable();
+
+            if (inicidenceFiltersDTO.EmployeeId != 0)
+            {
+                baseQueryable = baseQueryable.Where(w => w.EmployeeId == inicidenceFiltersDTO.EmployeeId);
+            }
+
+            baseQueryable = baseQueryable.Where(w => w.Employee.StaffTypeId == inicidenceFiltersDTO.StaffTypeId)
+                             .Include(w => w.Employee);
+
+            var incidencesDTOs = new List<IncidenceTestDTO>();
+            //Llamamos solo una vez a la base todos los dias inhabiles
+            var nonWorkingDaysList = await Context.NonWorkingDays
+            .Where(n => n.StartDate <= inicidenceFiltersDTO.FinalDate && n.FinalDate >= inicidenceFiltersDTO.StartDate)
+            .ToListAsync();
+           
+
+            // Crear un diccionario para acceder rápidamente a los días inhábiles
+            var nonWorkingDaysDict = new Dictionary<DateTime, bool>();
+            foreach (var nonWorkingDay in nonWorkingDaysList)
+            {
+                for (var date = nonWorkingDay.StartDate; date <= nonWorkingDay.FinalDate; date = date.AddDays(1))
+                {
+                    nonWorkingDaysDict[date] = true;
+                }
+            }
+
+
+            // Cargar todos los registros de horarios relevantes en una sola llamada
+            var allSchedules = await baseQueryable.Where(w =>
+            w.StartDate <= inicidenceFiltersDTO.FinalDate &&
+            w.FinalDate >= inicidenceFiltersDTO.StartDate)
+            .ToListAsync();
+            // Crear un diccionario para indexar los horarios por día de la semana
+            var schedulesByDayOfWeek = new Dictionary<DayOfWeek, List<WorkSchedule>>
+    {
+        { DayOfWeek.Monday, new List<WorkSchedule>() },
+        { DayOfWeek.Tuesday, new List<WorkSchedule>() },
+        { DayOfWeek.Wednesday, new List<WorkSchedule>() },
+        { DayOfWeek.Thursday, new List<WorkSchedule>() },
+        { DayOfWeek.Friday, new List<WorkSchedule>() },
+        { DayOfWeek.Saturday, new List<WorkSchedule>() },
+        { DayOfWeek.Sunday, new List<WorkSchedule>() }
+    };
+            // Indexar los horarios por empleado y día de la semana
+            var schedulesByEmployeeAndDay = allSchedules
+                .GroupBy(w => new { w.EmployeeId, Day = (int)w.StartDate.DayOfWeek })
+                .ToDictionary(g => g.Key, g => g.ToList());
+            // Indexar los horarios por día de la semana, excluyendo los que tienen CheckIn en TimeSpan.Zero
+            foreach (var schedule in allSchedules)
+            {
+                if (schedule.MondayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Monday].Add(schedule);
+                if (schedule.TuesdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Tuesday].Add(schedule);
+                if (schedule.WednesdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Wednesday].Add(schedule);
+                if (schedule.ThursdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Thursday].Add(schedule);
+                if (schedule.FridayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Friday].Add(schedule);
+                if (schedule.SaturdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Saturday].Add(schedule);
+                if (schedule.SundayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Sunday].Add(schedule);
+            }
+            // Cargar todos los permisos de trabajo relevantes en una sola llamada
+            var allPermits = await Context.WorkPermits
+                .Include(w => w.Permit)
+                .Where(p => p.IsActive == true && p.StartDate <= inicidenceFiltersDTO.FinalDate && p.FinalDate >= inicidenceFiltersDTO.StartDate)
+                .ToListAsync();
+
+            // Crear un diccionario para acceder rápidamente a los permisos por empleado y fecha
+            var permitsByEmployeeId = allPermits.GroupBy(p => p.EmployeeId)
+                                                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Delegados para acceder a los horarios de check-in y check-out
+            Func<WorkSchedule, TimeSpan>[] checkIns = new Func<WorkSchedule, TimeSpan>[]
+            {
+            s => s.SundayCheckIn,   // DayOfWeek.Sunday = 0
+            s => s.MondayCheckIn,   // DayOfWeek.Monday = 1
+            s => s.TuesdayCheckIn,  // DayOfWeek.Tuesday = 2
+            s => s.WednesdayCheckIn,// DayOfWeek.Wednesday = 3
+            s => s.ThursdayCheckIn, // DayOfWeek.Thursday = 4
+            s => s.FridayCheckIn,   // DayOfWeek.Friday = 5
+            s => s.SaturdayCheckIn  // DayOfWeek.Saturday = 6
+            };
+
+            Func<WorkSchedule, TimeSpan>[] checkOuts = new Func<WorkSchedule, TimeSpan>[]
+            {
+            s => s.SundayCheckOut,
+            s => s.MondayCheckOut,
+            s => s.TuesdayCheckOut,
+            s => s.WednesdayCheckOut,
+            s => s.ThursdayCheckOut,
+            s => s.FridayCheckOut,
+            s => s.SaturdayCheckOut
+            };
+            var allAttendances = await Context.Attendances
+            .Where(a => a.Date >= inicidenceFiltersDTO.StartDate && a.Date <= inicidenceFiltersDTO.FinalDate)
+            .Include(a => a.Station)
+            .ToListAsync();
+
+
+            for (var day = inicidenceFiltersDTO.StartDate; day <= inicidenceFiltersDTO.FinalDate; day = day.AddDays(1))
+            {
+
+                var incidentsForDate = incidents
+                .Where(incident => day >= incident.StartDate && day <= incident.EndDate)
+                .ToList();
+
+                // Verificar si es día inhábil usando el diccionario
+                var isNonWorkingDay = nonWorkingDaysDict.ContainsKey(day);
+                if (!isNonWorkingDay)
+                {
+                    // Obtener el día de la semana actual
+                    var currentDayOfWeek = day.DayOfWeek;
+
+                    // Filtrar y ordenar los horarios del día actual en memoria
+                    var schedules = schedulesByDayOfWeek[currentDayOfWeek]
+                        .Where(w => w.StartDate <= day && w.FinalDate >= day)
+                        .OrderBy(w =>
+                            currentDayOfWeek switch
+                            {
+                                DayOfWeek.Monday => w.MondayCheckIn,
+                                DayOfWeek.Tuesday => w.TuesdayCheckIn,
+                                DayOfWeek.Wednesday => w.WednesdayCheckIn,
+                                DayOfWeek.Thursday => w.ThursdayCheckIn,
+                                DayOfWeek.Friday => w.FridayCheckIn,
+                                DayOfWeek.Saturday => w.SaturdayCheckIn,
+                                DayOfWeek.Sunday => w.SundayCheckIn,
+                                _ => TimeSpan.MaxValue
+                            })
+                        .ToList();
+
+
+                    // Limite para separar checadas de entrada y checadas de salida
+                    TimeSpan limitTime;
+                    // Horario de entrada dependiendo el día
+                    TimeSpan timeIn;
+                    // Horario de salida dependiendo el día
+                    TimeSpan timeOut;
+
+                    // Final e Inicio del dia
+                    TimeSpan endOfTheDay;
+                    TimeSpan startOfTheDay;
+
+
+
+                    for (int i = 0; i < schedules.LongCount(); i++)
+                    {
+
+                        var employeeDTO = Mapper.Map<EmployeeWithoutDetailsDTO>(schedules[i].Employee);
+
+                        // Obtener los permisos de la base de datos que esten en fecha
+                        var employeePermits = permitsByEmployeeId.TryGetValue(employeeDTO.Id, out var permits) ? permits : new List<WorkPermit>();
+                        var permitEmployee = employeePermits.FirstOrDefault(p =>
+                            p.StartDate <= day && p.FinalDate >= day);
+
+                        // Calcular la hora que corresponde a la mitad de su horario.
+                        var dayOfWeek = (int)day.DayOfWeek;
+                        var schedule = schedules[i];
+                        timeIn = checkIns[dayOfWeek](schedule);
+                        timeOut = checkOuts[dayOfWeek](schedule);
+                        limitTime = timeIn.Add(timeOut.Subtract(timeIn) / 2);
+
+                        // Verificar si el empleado tiene otro horario
+
+                        var hasAnotherSchedules = schedulesByEmployeeAndDay
+                                        .Where(s => s.Key.EmployeeId == employeeDTO.Id && s.Key.Day == dayOfWeek)
+                                        .SelectMany(s => s.Value)
+                                        .Where(w => w.StartDate <= day && w.FinalDate >= day && w.Id != schedules[i].Id)
+                                        .ToList();
+
+                        var nextSchedule = hasAnotherSchedules
+                            .Where(w => checkIns[dayOfWeek](w) > checkIns[dayOfWeek](schedule))
+                            .OrderBy(w => checkIns[dayOfWeek](w))
+                            .FirstOrDefault();
+
+                        var previousSchedule = hasAnotherSchedules
+                            .Where(w => checkIns[dayOfWeek](w) < checkIns[dayOfWeek](schedule))
+                            .OrderByDescending(w => checkIns[dayOfWeek](w))
+                            .FirstOrDefault();
+
+                        if (nextSchedule != null)
+                        {
+                            var endOfTheLastDay = previousSchedule != null
+                                ? checkIns[dayOfWeek](previousSchedule).Add(timeOut.Subtract(checkIns[dayOfWeek](previousSchedule)) / 2)
+                                : new TimeSpan(0, 0, 0);
+
+                            startOfTheDay = endOfTheLastDay.Add(new TimeSpan(0, 0, 1));
+                            endOfTheDay = checkIns[dayOfWeek](nextSchedule).Add(timeOut.Subtract(checkIns[dayOfWeek](nextSchedule)) / 2);
+                        }
+                        else
+                        {
+                            var endOfTheLastDay = previousSchedule != null
+                                ? checkIns[dayOfWeek](previousSchedule).Add(timeOut.Subtract(checkIns[dayOfWeek](previousSchedule)) / 2)
+                                : new TimeSpan(0, 0, 0);
+
+                            startOfTheDay = endOfTheLastDay.Add(new TimeSpan(0, 0, 1));
+                            endOfTheDay = new TimeSpan(23, 0, 0);
+                        }
+
+
+                        // ======= CALCULAR CHECADA GANADORA DE ENTRADA ====== //
+                        var attendanceIn = allAttendances
+                            .Where(a => a.EmployeeId == schedules[i].EmployeeId
+                                        && a.Date.Date == day.Date
+                                        && a.Time >= startOfTheDay
+                                        && a.Time <= endOfTheDay
+                                        && a.Time <= limitTime)
+                            .OrderBy(a => Math.Abs((a.Time - timeIn).Ticks))
+                            .FirstOrDefault();
+
+                        // ======= CALCULAR CHECADA GANADORA DE SALIDA ====== //
+                        var attendanceOut = allAttendances
+                            .Where(a => a.EmployeeId == schedules[i].EmployeeId
+                                        && a.Date.Date == day.Date
+                                        && a.Time >= startOfTheDay
+                                        && a.Time <= endOfTheDay
+                                        && a.Time > limitTime)
+                            .OrderBy(a => Math.Abs((a.Time - timeOut).Ticks))
+                            .FirstOrDefault();
+                        if (attendanceIn == null)
+                        {
+                            attendanceIn = new Attendance();
+                        }
+                        if (attendanceOut == null)
+                        {
+                            attendanceOut = new Attendance();
+
+                        }
+                        var attendanceInDTO = Mapper.Map<AttendanceDTO>(attendanceIn);
+                        var attendanceOutDTO = Mapper.Map<AttendanceDTO>(attendanceOut);
+
+                        // Crear la incidencia
+                        var incidenceDTO = new IncidenceTestDTO
+                        {
+                            Employee = employeeDTO,
+                            Date = day,
+                            Attendances = new List<AttendanceDTO> { attendanceInDTO, attendanceOutDTO },
+                            Checks = new List<TimeSpan> { timeIn, timeOut },
+                            Descriptions = new List<string>(),
+                            Types = new List<int>(),
+                            Color = new List<string>(),
+                            Name = new List<string>(),
+                        };
+
+
+                        // ============ INCIDENCIAAA ENTRADA ============ 
+
+                        // attendanceIn.Time tengo la hora de la checada ganadora
+
+                        TimeSpan timeInSubMin = timeIn.Subtract(timesTolerancia.InputMin);
+                        TimeSpan timeInAddMax = timeIn.Add(timesTolerancia.InputMax);
+                        TimeSpan timeInAddMaxTwice = timeInAddMax.Add(timesTolerancia.InputMax);
+                        TimeSpan timeInAddMaxThrice = timeInAddMaxTwice.Add(timesTolerancia.InputMax);
+                        if (attendanceIn.Time >= timeInSubMin && attendanceIn.Time <= timeInAddMax)
+                        {
+                            incidenceDTO.Descriptions.Add($"Sin incidencia, entrada correcta. Su asistencia fue registrada dentro del límite de tolerancia. {timeInSubMin} y {timeInAddMax}");
+                            incidenceDTO.Name.Add("Entrada correcta");
+                            incidenceDTO.Color.Add("#007BFF");
+
+                        }
+                        else
+                        {
+
+                            foreach (var incident in incidentsForDate)
+                            {
+                                if (attendanceIn.Time == TimeSpan.Zero && (incident.TimeMin != TimeSpan.Zero || incident.TimeMax != TimeSpan.Zero))
+                                {
+                                    continue;
+                                }
+                                    if (incident.IsEntry == false)
+                                {
+                                    continue;
+                                }
+                                TimeSpan timeMin;
+                                TimeSpan timeMax;
+
+
+                                if (incident.IsBeforeCheckPoint)
+                                {
+                                    timeMin = timeIn.Subtract(incident.TimeMin);
+                                    timeMax = timeIn.Subtract(incident.TimeMax);
+                                }
+                                else
+                                {
+                                    timeMin = timeIn.Add(incident.TimeMin);
+                                    timeMax = timeIn.Add(incident.TimeMax);
+                                }
+
+                                if (incident.TimeMin == TimeSpan.Zero && incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    if (attendanceIn.Time == TimeSpan.Zero)
+                                    {
+                                        var attendanceToday = allAttendances
+                               .FirstOrDefault(a =>
+                                   a.EmployeeId == schedules[i].EmployeeId &&
+                                   a.Date.Date == day.Date &&
+                                   a.Time > timeInAddMaxThrice &&
+                                   a.Time >= startOfTheDay &&
+                                   a.Time <= endOfTheDay);
+
+                                        if (attendanceToday == null)
+                                        {
+                                            incidenceDTO.Descriptions.Add("No hay un registro de asistencia.");
+                                            incidenceDTO.Name.Add("Falta");
+                                            incidenceDTO.Color.Add("#FF0000");
+
+                                        }
+                                        else
+                                        {
+                                            incidenceDTO.Descriptions.Add(incident.Description);
+                                            incidenceDTO.Color.Add(incident.Color);
+                                            incidenceDTO.Name.Add(incident.Name);
+
+                                        }
+                                        break;
+                                    }
+                                    continue;
+
+
+                                }
+                                else if (incident.TimeMin == TimeSpan.Zero)
+                                {
+                                    timeMin = attendanceIn.Time;
+                                }
+                                else if (incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    timeMax = attendanceIn.Time;
+                                }
+                                else if (timeMin > timeMax)
+                                {
+                                    var aux = timeMin;
+                                    timeMin = timeMax;
+                                    timeMax = aux;
+
+                                }
+
+                                if (attendanceIn.Time >= timeMin && attendanceIn.Time <= timeMax)
+                                {
+                                    incidenceDTO.Descriptions.Add(incident.Description);
+                                   
+                                    incidenceDTO.Name.Add(incident.Name); 
+                                    incidenceDTO.Color.Add(incident.Color);
+                                    break;
+                                }
+                            }
+                        }
+
+
+
+                     
+
+                        // RETARDO A -
+                        // RETARDO B -
+                        // SIN INCIDENCIA - 
+                        // ENTRADA PREVIA - 
+                        // ENTRADA TARDIA -
+                        // FALTA -
+                        // OMISIÓN DE ENTRADA -
+
+                        // ============ INCIDENCIAAA SALIDA ============ 
+
+
+                        TimeSpan timeOutSubMin = timeOut.Subtract(timesTolerancia.OutputMin);
+                        TimeSpan timeOutAddMax = timeOut.Add(timesTolerancia.OutputMax);
+
+
+                        if (attendanceOut.Time >= timeOutSubMin && attendanceOut.Time <= timeOutAddMax)
+                        {
+                            incidenceDTO.Descriptions.Add($"Sin incidencia, salida correcta. Su salida fue registrada dentro del límite de tolerancia. {timeOutSubMin} y {timeOutAddMax}");
+                            incidenceDTO.Name.Add("Salida correcta");
+                            incidenceDTO.Color.Add("#007BFF"); 
+                           
+                        }
+                        else
+                        {
+                            foreach (var incident in incidentsForDate)
+                            {
+                                if (attendanceOut.Time == TimeSpan.Zero && (incident.TimeMin != TimeSpan.Zero || incident.TimeMax != TimeSpan.Zero))
+                                {
+                                    continue;
+                                }
+                                if (incident.IsEntry )
+                                {
+                                    continue;
+                                }
+                                TimeSpan timeMin;
+                                TimeSpan timeMax;
+
+
+                                if (incident.IsBeforeCheckPoint)
+                                {
+                                    timeMin = timeOut.Subtract(incident.TimeMin);
+                                    timeMax = timeOut.Subtract(incident.TimeMax);
+                                }
+                                else
+                                {
+                                    timeMin = timeOut.Add(incident.TimeMin);
+                                    timeMax = timeOut.Add(incident.TimeMax);
+                                }
+
+                                if (incident.TimeMin == TimeSpan.Zero && incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    if (attendanceOut.Time == TimeSpan.Zero)
+                                    {
+                                        var attendanceToday = allAttendances
+                               .FirstOrDefault(a =>
+                                   a.EmployeeId == schedules[i].EmployeeId &&
+                                   a.Date.Date == day.Date &&
+                                   a.Time < limitTime &&
+                                   a.Time >= startOfTheDay &&
+                                   a.Time <= endOfTheDay);
+
+                                        if (attendanceToday == null)
+                                        {
+                                            incidenceDTO.Descriptions.Add("No hay un registro de asistencia.");
+                                            incidenceDTO.Name.Add("Falta");
+                                            incidenceDTO.Color.Add("#FF0000");
+                                        }
+                                        else
+                                        {
+                                            incidenceDTO.Descriptions.Add(incident.Description);
+                                            incidenceDTO.Color.Add(incident.Color);
+                                            incidenceDTO.Name.Add(incident.Name);
+                                        }
+                                        break;
+                                    }
+                                    continue;
+
+
+                                }
+                                else if (incident.TimeMin == TimeSpan.Zero)
+                                {
+                                    timeMin = attendanceOut.Time;
+                                }
+                                else if (incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    timeMax = attendanceOut.Time;
+                                }
+                                else if (timeMin > timeMax)
+                                {
+                                    var aux = timeMin;
+                                    timeMin = timeMax;
+                                    timeMax = aux;
+
+                                }
+
+                                if (attendanceOut.Time >= timeMin && attendanceOut.Time <= timeMax)
+                                {
+                                    incidenceDTO.Descriptions.Add(incident.Description);
+                                    incidenceDTO.Color.Add(incident.Color);
+                                    incidenceDTO.Name.Add(incident.Name);
+                                    break;
+                                }
+                            }
+
+
+
+                        }
+
+                     
+                        if (permitEmployee != null)
+                        {
+                            var permitEmployeeDTO = Mapper.Map<WorkPermitDTO>(permitEmployee);
+                            incidenceDTO.Permit = permitEmployeeDTO;
+                            var description = $"Permiso {permitEmployeeDTO.Permit.Title} " + (permitEmployeeDTO.Permit.RequiredAttendance ? "con " : "sin ") + "registro de reloj.";
+
+                            if (permitEmployee.Type == 0 || permitEmployee.WorkScheduleId == schedules[i].Id)
+                            {
+                                incidenceDTO.Descriptions[0] = description;
+                                incidenceDTO.Descriptions[1] = description;
+                            }
+                        }
+
+
+                        var Attendances = allAttendances
+                        .Where(a => a.EmployeeId == schedules[i].EmployeeId && a.Date.Date == day.Date)
+                        .ToList();
+                        var attendanceDTO = Mapper.Map<List<AttendanceDTO>>(Attendances);
+                        incidenceDTO.AttendancesAll = attendanceDTO;
+
+                        incidencesDTOs.Add(incidenceDTO);
+
+
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("DIA INHABIL");
+                }
+            }
+
+
+
+
+
+          return incidencesDTOs;
+
+        }
 
 
 
@@ -1541,37 +2077,16 @@ namespace TecNMEmployeesAPI.Controllers
                     worksheet.Cell(currentRow, 5).Value = user.Date.ToString("d");
 
 
-                    worksheet.Cell(currentRow, 6).Value = user.Types[0] != 1 && user.Attendances[0].Time.ToString(@"hh\:mm\:ss") != "00:00:00" ? (user.Attendances[0].Time) : "--";
-                    worksheet.Cell(currentRow, 7).Value =
-                            user.Types[0] == 1 ? "Entrada correcta" :
-                            user.Types[0] == 2 ? "Entrada Previa" :
-                            user.Types[0] == 3 ? "Retardo A" :
-                            user.Types[0] == 4 ? "Retardo B" :
-                            user.Types[0] == 5 ? "Entrada Tardía" :
-                            user.Types[0] == 6 ? "Omisión de entrada" :
-                            user.Types[0] == 7 ? "Falta" :
-                            user.Types[0] == 8 ? "Salida correcta" :
-                            user.Types[0] == 9 ? "Salida Previa" :
-                            user.Types[0] == 10 ? "Omisión de salida" :
-                            user.Types[0] == 11 ? "Salida Tardía" : "";
-                    worksheet.Cell(currentRow, 8).Value = user.Types[0] != 1 ? user.Descriptions[0] : "--";
+                    worksheet.Cell(currentRow, 6).Value = user.Name[0] != "Entrada correcta" && user.Attendances[0].Time.ToString(@"hh\:mm\:ss") != "00:00:00" ? (user.Attendances[0].Time) : "--";
+                    worksheet.Cell(currentRow, 7).Value = user.Name[0];
+                    worksheet.Cell(currentRow, 8).Value = user.Name[0] != "Entrada correcta" ? user.Descriptions[0] : "--";
 
 
 
 
-                    worksheet.Cell(currentRow, 9).Value = user.Types[1] != 8 && user.Attendances[1].Time.ToString(@"hh\:mm\:ss") != "00:00:00" ? (user.Attendances[1].Time) : "--";
-                    worksheet.Cell(currentRow, 10).Value = user.Types[1] == 1 ? "Entrada correcta" :
-                        user.Types[1] == 2 ? "Entrada Previa" :
-                        user.Types[1] == 3 ? "Retardo A" :
-                        user.Types[1] == 4 ? "Retardo B" :
-                        user.Types[1] == 5 ? "Entrada Tardía" :
-                        user.Types[1] == 6 ? "Omisión de entrada" :
-                        user.Types[1] == 7 ? "Falta" :
-                        user.Types[1] == 8 ? "Salida correcta" :
-                        user.Types[1] == 9 ? "Salida Previa" :
-                        user.Types[1] == 10 ? "Omisión de salida" :
-                        user.Types[1] == 11 ? "Salida Tardía" : "";
-                    worksheet.Cell(currentRow, 11).Value = user.Types[1] != 8 ? user.Descriptions[1] : "--";
+                    worksheet.Cell(currentRow, 9).Value = user.Name[1] != "Salida correcta" && user.Attendances[1].Time.ToString(@"hh\:mm\:ss") != "00:00:00" ? (user.Attendances[1].Time) : "--";
+                    worksheet.Cell(currentRow, 10).Value = user.Name[1];
+                    worksheet.Cell(currentRow, 11).Value = user.Name[1] != "Salida correcta" ? user.Descriptions[1] : "--";
 
                     for (int i = 0; i < user.AttendancesAll.Count; i++)
                     {
@@ -1606,11 +2121,549 @@ namespace TecNMEmployeesAPI.Controllers
 
 
 
-
-
-
-
         [HttpGet("bad")]
+        public async Task<ActionResult<List<IncidenceTestDTO>>> GetAllIncidencias2([FromQuery] InicidenceFiltersDTO inicidenceFiltersDTO)
+
+        {
+
+
+            var sfattType = await Context.StaffTypes.FirstOrDefaultAsync(s => s.Id == inicidenceFiltersDTO.StaffTypeId);
+
+            if (sfattType == null)
+            {
+                return NotFound($"No existe un tipo de empleado con el ID ${inicidenceFiltersDTO.StaffTypeId}.");
+            }
+
+            var incidents = await Context.Incidents
+             .Where(n => n.StaffTypeId == inicidenceFiltersDTO.StaffTypeId &&
+                         ((n.StartDate <= inicidenceFiltersDTO.FinalDate && n.EndDate >= inicidenceFiltersDTO.StartDate)))
+             .ToListAsync();
+
+
+            // Obtener el dia de hoy
+            // DIA DE HOY
+            System.DateTime dateToday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
+
+            // VALIDAR QUE LOS FILTROS NO SEAN MENOR AL DIA DE HOY
+            if (inicidenceFiltersDTO.StartDate >= dateToday || inicidenceFiltersDTO.FinalDate >= dateToday)
+            {
+                return BadRequest("No se permite hacer incidencia en el día o posterior.");
+            }
+
+            // Obtener los tiempos de tolerancia
+            var timesTolerancia = await Context.Times
+                            .FirstOrDefaultAsync(t => t.StaffTypeId == inicidenceFiltersDTO.StaffTypeId);
+            if (timesTolerancia == null)
+            {
+                return NotFound("No existe tiempos de tolerancia");
+            }
+            //Creamos un filtro base para evitar volver a crearla en cada iteracion
+            var baseQueryable = Context.WorkSchedules.AsQueryable();
+
+            if (inicidenceFiltersDTO.EmployeeId != 0)
+            {
+                baseQueryable = baseQueryable.Where(w => w.EmployeeId == inicidenceFiltersDTO.EmployeeId);
+            }
+
+            baseQueryable = baseQueryable.Where(w => w.Employee.StaffTypeId == inicidenceFiltersDTO.StaffTypeId)
+                             .Include(w => w.Employee);
+
+            var incidencesDTOs = new List<IncidenceTestDTO>();
+            //Llamamos solo una vez a la base todos los dias inhabiles
+            var nonWorkingDaysList = await Context.NonWorkingDays
+            .Where(n => n.StartDate <= inicidenceFiltersDTO.FinalDate && n.FinalDate >= inicidenceFiltersDTO.StartDate)
+            .ToListAsync();
+
+
+            // Crear un diccionario para acceder rápidamente a los días inhábiles
+            var nonWorkingDaysDict = new Dictionary<DateTime, bool>();
+            foreach (var nonWorkingDay in nonWorkingDaysList)
+            {
+                for (var date = nonWorkingDay.StartDate; date <= nonWorkingDay.FinalDate; date = date.AddDays(1))
+                {
+                    nonWorkingDaysDict[date] = true;
+                }
+            }
+
+
+            // Cargar todos los registros de horarios relevantes en una sola llamada
+            var allSchedules = await baseQueryable.Where(w =>
+            w.StartDate <= inicidenceFiltersDTO.FinalDate &&
+            w.FinalDate >= inicidenceFiltersDTO.StartDate)
+            .ToListAsync();
+            // Crear un diccionario para indexar los horarios por día de la semana
+            var schedulesByDayOfWeek = new Dictionary<DayOfWeek, List<WorkSchedule>>
+    {
+        { DayOfWeek.Monday, new List<WorkSchedule>() },
+        { DayOfWeek.Tuesday, new List<WorkSchedule>() },
+        { DayOfWeek.Wednesday, new List<WorkSchedule>() },
+        { DayOfWeek.Thursday, new List<WorkSchedule>() },
+        { DayOfWeek.Friday, new List<WorkSchedule>() },
+        { DayOfWeek.Saturday, new List<WorkSchedule>() },
+        { DayOfWeek.Sunday, new List<WorkSchedule>() }
+    };
+            // Indexar los horarios por empleado y día de la semana
+            var schedulesByEmployeeAndDay = allSchedules
+                .GroupBy(w => new { w.EmployeeId, Day = (int)w.StartDate.DayOfWeek })
+                .ToDictionary(g => g.Key, g => g.ToList());
+            // Indexar los horarios por día de la semana, excluyendo los que tienen CheckIn en TimeSpan.Zero
+            foreach (var schedule in allSchedules)
+            {
+                if (schedule.MondayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Monday].Add(schedule);
+                if (schedule.TuesdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Tuesday].Add(schedule);
+                if (schedule.WednesdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Wednesday].Add(schedule);
+                if (schedule.ThursdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Thursday].Add(schedule);
+                if (schedule.FridayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Friday].Add(schedule);
+                if (schedule.SaturdayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Saturday].Add(schedule);
+                if (schedule.SundayCheckIn != TimeSpan.Zero)
+                    schedulesByDayOfWeek[DayOfWeek.Sunday].Add(schedule);
+            }
+            // Cargar todos los permisos de trabajo relevantes en una sola llamada
+            var allPermits = await Context.WorkPermits
+                .Include(w => w.Permit)
+                .Where(p => p.IsActive == true && p.StartDate <= inicidenceFiltersDTO.FinalDate && p.FinalDate >= inicidenceFiltersDTO.StartDate)
+                .ToListAsync();
+
+            // Crear un diccionario para acceder rápidamente a los permisos por empleado y fecha
+            var permitsByEmployeeId = allPermits.GroupBy(p => p.EmployeeId)
+                                                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Delegados para acceder a los horarios de check-in y check-out
+            Func<WorkSchedule, TimeSpan>[] checkIns = new Func<WorkSchedule, TimeSpan>[]
+            {
+            s => s.SundayCheckIn,   // DayOfWeek.Sunday = 0
+            s => s.MondayCheckIn,   // DayOfWeek.Monday = 1
+            s => s.TuesdayCheckIn,  // DayOfWeek.Tuesday = 2
+            s => s.WednesdayCheckIn,// DayOfWeek.Wednesday = 3
+            s => s.ThursdayCheckIn, // DayOfWeek.Thursday = 4
+            s => s.FridayCheckIn,   // DayOfWeek.Friday = 5
+            s => s.SaturdayCheckIn  // DayOfWeek.Saturday = 6
+            };
+
+            Func<WorkSchedule, TimeSpan>[] checkOuts = new Func<WorkSchedule, TimeSpan>[]
+            {
+            s => s.SundayCheckOut,
+            s => s.MondayCheckOut,
+            s => s.TuesdayCheckOut,
+            s => s.WednesdayCheckOut,
+            s => s.ThursdayCheckOut,
+            s => s.FridayCheckOut,
+            s => s.SaturdayCheckOut
+            };
+            var allAttendances = await Context.Attendances
+            .Where(a => a.Date >= inicidenceFiltersDTO.StartDate && a.Date <= inicidenceFiltersDTO.FinalDate)
+            .Include(a => a.Station)
+            .ToListAsync();
+
+
+            for (var day = inicidenceFiltersDTO.StartDate; day <= inicidenceFiltersDTO.FinalDate; day = day.AddDays(1))
+            {
+
+                var incidentsForDate = incidents
+                .Where(incident => day >= incident.StartDate && day <= incident.EndDate)
+                .ToList();
+
+                // Verificar si es día inhábil usando el diccionario
+                var isNonWorkingDay = nonWorkingDaysDict.ContainsKey(day);
+                if (!isNonWorkingDay)
+                {
+                    // Obtener el día de la semana actual
+                    var currentDayOfWeek = day.DayOfWeek;
+
+                    // Filtrar y ordenar los horarios del día actual en memoria
+                    var schedules = schedulesByDayOfWeek[currentDayOfWeek]
+                        .Where(w => w.StartDate <= day && w.FinalDate >= day)
+                        .OrderBy(w =>
+                            currentDayOfWeek switch
+                            {
+                                DayOfWeek.Monday => w.MondayCheckIn,
+                                DayOfWeek.Tuesday => w.TuesdayCheckIn,
+                                DayOfWeek.Wednesday => w.WednesdayCheckIn,
+                                DayOfWeek.Thursday => w.ThursdayCheckIn,
+                                DayOfWeek.Friday => w.FridayCheckIn,
+                                DayOfWeek.Saturday => w.SaturdayCheckIn,
+                                DayOfWeek.Sunday => w.SundayCheckIn,
+                                _ => TimeSpan.MaxValue
+                            })
+                        .ToList();
+
+
+                    // Limite para separar checadas de entrada y checadas de salida
+                    TimeSpan limitTime;
+                    // Horario de entrada dependiendo el día
+                    TimeSpan timeIn;
+                    // Horario de salida dependiendo el día
+                    TimeSpan timeOut;
+
+                    // Final e Inicio del dia
+                    TimeSpan endOfTheDay;
+                    TimeSpan startOfTheDay;
+
+
+
+                    for (int i = 0; i < schedules.LongCount(); i++)
+                    {
+
+                        var employeeDTO = Mapper.Map<EmployeeWithoutDetailsDTO>(schedules[i].Employee);
+
+                        // Obtener los permisos de la base de datos que esten en fecha
+                        var employeePermits = permitsByEmployeeId.TryGetValue(employeeDTO.Id, out var permits) ? permits : new List<WorkPermit>();
+                        var permitEmployee = employeePermits.FirstOrDefault(p =>
+                            p.StartDate <= day && p.FinalDate >= day);
+
+                        // Calcular la hora que corresponde a la mitad de su horario.
+                        var dayOfWeek = (int)day.DayOfWeek;
+                        var schedule = schedules[i];
+                        timeIn = checkIns[dayOfWeek](schedule);
+                        timeOut = checkOuts[dayOfWeek](schedule);
+                        limitTime = timeIn.Add(timeOut.Subtract(timeIn) / 2);
+
+                        // Verificar si el empleado tiene otro horario
+
+                        var hasAnotherSchedules = schedulesByEmployeeAndDay
+                                        .Where(s => s.Key.EmployeeId == employeeDTO.Id && s.Key.Day == dayOfWeek)
+                                        .SelectMany(s => s.Value)
+                                        .Where(w => w.StartDate <= day && w.FinalDate >= day && w.Id != schedules[i].Id)
+                                        .ToList();
+
+                        var nextSchedule = hasAnotherSchedules
+                            .Where(w => checkIns[dayOfWeek](w) > checkIns[dayOfWeek](schedule))
+                            .OrderBy(w => checkIns[dayOfWeek](w))
+                            .FirstOrDefault();
+
+                        var previousSchedule = hasAnotherSchedules
+                            .Where(w => checkIns[dayOfWeek](w) < checkIns[dayOfWeek](schedule))
+                            .OrderByDescending(w => checkIns[dayOfWeek](w))
+                            .FirstOrDefault();
+
+                        if (nextSchedule != null)
+                        {
+                            var endOfTheLastDay = previousSchedule != null
+                                ? checkIns[dayOfWeek](previousSchedule).Add(timeOut.Subtract(checkIns[dayOfWeek](previousSchedule)) / 2)
+                                : new TimeSpan(0, 0, 0);
+
+                            startOfTheDay = endOfTheLastDay.Add(new TimeSpan(0, 0, 1));
+                            endOfTheDay = checkIns[dayOfWeek](nextSchedule).Add(timeOut.Subtract(checkIns[dayOfWeek](nextSchedule)) / 2);
+                        }
+                        else
+                        {
+                            var endOfTheLastDay = previousSchedule != null
+                                ? checkIns[dayOfWeek](previousSchedule).Add(timeOut.Subtract(checkIns[dayOfWeek](previousSchedule)) / 2)
+                                : new TimeSpan(0, 0, 0);
+
+                            startOfTheDay = endOfTheLastDay.Add(new TimeSpan(0, 0, 1));
+                            endOfTheDay = new TimeSpan(23, 0, 0);
+                        }
+
+
+                        // ======= CALCULAR CHECADA GANADORA DE ENTRADA ====== //
+                        var attendanceIn = allAttendances
+                            .Where(a => a.EmployeeId == schedules[i].EmployeeId
+                                        && a.Date.Date == day.Date
+                                        && a.Time >= startOfTheDay
+                                        && a.Time <= endOfTheDay
+                                        && a.Time <= limitTime)
+                            .OrderBy(a => Math.Abs((a.Time - timeIn).Ticks))
+                            .FirstOrDefault();
+
+                        // ======= CALCULAR CHECADA GANADORA DE SALIDA ====== //
+                        var attendanceOut = allAttendances
+                            .Where(a => a.EmployeeId == schedules[i].EmployeeId
+                                        && a.Date.Date == day.Date
+                                        && a.Time >= startOfTheDay
+                                        && a.Time <= endOfTheDay
+                                        && a.Time > limitTime)
+                            .OrderBy(a => Math.Abs((a.Time - timeOut).Ticks))
+                            .FirstOrDefault();
+                        if (attendanceIn == null)
+                        {
+                            attendanceIn = new Attendance();
+                        }
+                        if (attendanceOut == null)
+                        {
+                            attendanceOut = new Attendance();
+
+                        }
+                        var attendanceInDTO = Mapper.Map<AttendanceDTO>(attendanceIn);
+                        var attendanceOutDTO = Mapper.Map<AttendanceDTO>(attendanceOut);
+
+                        // Crear la incidencia
+                        var incidenceDTO = new IncidenceTestDTO
+                        {
+                            Employee = employeeDTO,
+                            Date = day,
+                            Attendances = new List<AttendanceDTO> { attendanceInDTO, attendanceOutDTO },
+                            Checks = new List<TimeSpan> { timeIn, timeOut },
+                            Descriptions = new List<string>(),
+                            Types = new List<int>(),
+                            Color = new List<string>(),
+                            Name = new List<string>(),
+                        };
+
+
+                        // ============ INCIDENCIAAA ENTRADA ============ 
+
+                        // attendanceIn.Time tengo la hora de la checada ganadora
+
+                        TimeSpan timeInSubMin = timeIn.Subtract(timesTolerancia.InputMin);
+                        TimeSpan timeInAddMax = timeIn.Add(timesTolerancia.InputMax);
+                        TimeSpan timeInAddMaxTwice = timeInAddMax.Add(timesTolerancia.InputMax);
+                        TimeSpan timeInAddMaxThrice = timeInAddMaxTwice.Add(timesTolerancia.InputMax);
+                        if (attendanceIn.Time >= timeInSubMin && attendanceIn.Time <= timeInAddMax)
+                        {
+                            incidenceDTO.Descriptions.Add($"Sin incidencia, entrada correcta. Su asistencia fue registrada dentro del límite de tolerancia. {timeInSubMin} y {timeInAddMax}");
+                            incidenceDTO.Name.Add("Entrada correcta");
+                            incidenceDTO.Color.Add("#007BFF");
+
+                        }
+                        else
+                        {
+
+                            foreach (var incident in incidentsForDate)
+                            {
+                                if (attendanceIn.Time == TimeSpan.Zero && (incident.TimeMin != TimeSpan.Zero || incident.TimeMax != TimeSpan.Zero))
+                                {
+                                    continue;
+                                }
+                                if (incident.IsEntry == false)
+                                {
+                                    continue;
+                                }
+                                TimeSpan timeMin;
+                                TimeSpan timeMax;
+
+
+                                if (incident.IsBeforeCheckPoint)
+                                {
+                                    timeMin = timeIn.Subtract(incident.TimeMin);
+                                    timeMax = timeIn.Subtract(incident.TimeMax);
+                                }
+                                else
+                                {
+                                    timeMin = timeIn.Add(incident.TimeMin);
+                                    timeMax = timeIn.Add(incident.TimeMax);
+                                }
+
+                                if (incident.TimeMin == TimeSpan.Zero && incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    if (attendanceIn.Time == TimeSpan.Zero)
+                                    {
+                                        var attendanceToday = allAttendances
+                               .FirstOrDefault(a =>
+                                   a.EmployeeId == schedules[i].EmployeeId &&
+                                   a.Date.Date == day.Date &&
+                                   a.Time > timeInAddMaxThrice &&
+                                   a.Time >= startOfTheDay &&
+                                   a.Time <= endOfTheDay);
+
+                                        if (attendanceToday == null)
+                                        {
+                                            incidenceDTO.Descriptions.Add("No hay un registro de asistencia.");
+                                            incidenceDTO.Name.Add("Falta");
+                                            incidenceDTO.Color.Add("#FF0000");
+
+                                        }
+                                        else
+                                        {
+                                            incidenceDTO.Descriptions.Add(incident.Description);
+                                            incidenceDTO.Color.Add(incident.Color);
+                                            incidenceDTO.Name.Add(incident.Name);
+
+                                        }
+                                        break;
+                                    }
+                                    continue;
+
+
+                                }
+                                else if (incident.TimeMin == TimeSpan.Zero)
+                                {
+                                    timeMin = attendanceIn.Time;
+                                }
+                                else if (incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    timeMax = attendanceIn.Time;
+                                }
+                                else if (timeMin > timeMax)
+                                {
+                                    var aux = timeMin;
+                                    timeMin = timeMax;
+                                    timeMax = aux;
+
+                                }
+
+                                if (attendanceIn.Time >= timeMin && attendanceIn.Time <= timeMax)
+                                {
+                                    incidenceDTO.Descriptions.Add(incident.Description);
+
+                                    incidenceDTO.Name.Add(incident.Name);
+                                    incidenceDTO.Color.Add(incident.Color);
+                                    break;
+                                }
+                            }
+                        }
+
+
+
+
+
+                        // RETARDO A -
+                        // RETARDO B -
+                        // SIN INCIDENCIA - 
+                        // ENTRADA PREVIA - 
+                        // ENTRADA TARDIA -
+                        // FALTA -
+                        // OMISIÓN DE ENTRADA -
+
+                        // ============ INCIDENCIAAA SALIDA ============ 
+
+
+                        TimeSpan timeOutSubMin = timeOut.Subtract(timesTolerancia.OutputMin);
+                        TimeSpan timeOutAddMax = timeOut.Add(timesTolerancia.OutputMax);
+
+
+                        if (attendanceOut.Time >= timeOutSubMin && attendanceOut.Time <= timeOutAddMax)
+                        {
+                            incidenceDTO.Descriptions.Add($"Sin incidencia, salida correcta. Su salida fue registrada dentro del límite de tolerancia. {timeOutSubMin} y {timeOutAddMax}");
+                            incidenceDTO.Name.Add("Salida correcta");
+                            incidenceDTO.Color.Add("#007BFF");
+
+                        }
+                        else
+                        {
+                            foreach (var incident in incidentsForDate)
+                            {
+                                if (attendanceOut.Time == TimeSpan.Zero && (incident.TimeMin != TimeSpan.Zero || incident.TimeMax != TimeSpan.Zero))
+                                {
+                                    continue;
+                                }
+                                if (incident.IsEntry)
+                                {
+                                    continue;
+                                }
+                                TimeSpan timeMin;
+                                TimeSpan timeMax;
+
+
+                                if (incident.IsBeforeCheckPoint)
+                                {
+                                    timeMin = timeOut.Subtract(incident.TimeMin);
+                                    timeMax = timeOut.Subtract(incident.TimeMax);
+                                }
+                                else
+                                {
+                                    timeMin = timeOut.Add(incident.TimeMin);
+                                    timeMax = timeOut.Add(incident.TimeMax);
+                                }
+
+                                if (incident.TimeMin == TimeSpan.Zero && incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    if (attendanceOut.Time == TimeSpan.Zero)
+                                    {
+                                        var attendanceToday = allAttendances
+                               .FirstOrDefault(a =>
+                                   a.EmployeeId == schedules[i].EmployeeId &&
+                                   a.Date.Date == day.Date &&
+                                   a.Time < limitTime &&
+                                   a.Time >= startOfTheDay &&
+                                   a.Time <= endOfTheDay);
+
+                                        if (attendanceToday == null)
+                                        {
+                                            incidenceDTO.Descriptions.Add("No hay un registro de asistencia.");
+                                            incidenceDTO.Name.Add("Falta");
+                                            incidenceDTO.Color.Add("#FF0000");
+                                        }
+                                        else
+                                        {
+                                            incidenceDTO.Descriptions.Add(incident.Description);
+                                            incidenceDTO.Color.Add(incident.Color);
+                                            incidenceDTO.Name.Add(incident.Name);
+                                        }
+                                        break;
+                                    }
+                                    continue;
+
+
+                                }
+                                else if (incident.TimeMin == TimeSpan.Zero)
+                                {
+                                    timeMin = attendanceOut.Time;
+                                }
+                                else if (incident.TimeMax == TimeSpan.Zero)
+                                {
+                                    timeMax = attendanceOut.Time;
+                                }
+                                else if (timeMin > timeMax)
+                                {
+                                    var aux = timeMin;
+                                    timeMin = timeMax;
+                                    timeMax = aux;
+
+                                }
+
+                                if (attendanceOut.Time >= timeMin && attendanceOut.Time <= timeMax)
+                                {
+                                    incidenceDTO.Descriptions.Add(incident.Description);
+                                    incidenceDTO.Color.Add(incident.Color);
+                                    incidenceDTO.Name.Add(incident.Name);
+                                    break;
+                                }
+                            }
+
+
+
+                        }
+
+
+                        if (permitEmployee != null)
+                        {
+                            var permitEmployeeDTO = Mapper.Map<WorkPermitDTO>(permitEmployee);
+                            incidenceDTO.Permit = permitEmployeeDTO;
+                            var description = $"Permiso {permitEmployeeDTO.Permit.Title} " + (permitEmployeeDTO.Permit.RequiredAttendance ? "con " : "sin ") + "registro de reloj.";
+
+                            if (permitEmployee.Type == 0 || permitEmployee.WorkScheduleId == schedules[i].Id)
+                            {
+                                incidenceDTO.Descriptions[0] = description;
+                                incidenceDTO.Descriptions[1] = description;
+                            }
+                        }
+
+
+                        var Attendances = allAttendances
+                        .Where(a => a.EmployeeId == schedules[i].EmployeeId && a.Date.Date == day.Date)
+                        .ToList();
+                        var attendanceDTO = Mapper.Map<List<AttendanceDTO>>(Attendances);
+                        incidenceDTO.AttendancesAll = attendanceDTO;
+
+                        incidencesDTOs.Add(incidenceDTO);
+
+
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("DIA INHABIL");
+                }
+            }
+
+            var filters = incidencesDTOs.FindAll(item => item.Name[0] != "Entrada correcta" || item.Name[1] != "Salida correcta");
+          
+
+            return filters;
+
+        }
+
+
+
+
+        [HttpGet("bad2")]
         public async Task<ActionResult<List<IncidenceTestDTO>>> GetAllIncidencias([FromQuery] InicidenceFiltersDTO inicidenceFiltersDTO)
         {
 
@@ -2642,7 +3695,7 @@ namespace TecNMEmployeesAPI.Controllers
             }
 
             var filters = incidencesDTOs.FindAll(item => item.Types[0] != 1 || item.Types[1] != 8);
-
+ 
             return filters;
 
         }
